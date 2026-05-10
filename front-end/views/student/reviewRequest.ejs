@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('../partials/head', { title: 'New Review Request' }) %>
+</head>
+<body>
+  <%- include('../partials/navbar', { user }) %>
+  <main class="container">
+    <%- include('../partials/header') %>
+    <h2>Student: <%= user.username %></h2>
+
+
+
+    <div class="panel">
+      <div class="panel-header">NEW REVIEW REQUEST</div>
+      <form id="student-review-request-form">
+        <div class="form-group">
+          <label>Message to instructor</label>
+          <textarea name="message" style="width:100%;height:120px;"
+            placeholder="please review my grade..."></textarea>
+        </div>
+        <button class="button" type="submit" style="float:right;">Submit</button>
+        <div style="clear:both;"></div>
+      </form>
+    </div>
+  </main>
+
+  <script type="module" src="/js/student/review-request.js"></script>
+</body>
+</html>

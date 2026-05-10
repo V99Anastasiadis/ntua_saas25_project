@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('../partials/head', { title: 'Review Requests' }) %>
+</head>
+<body>
+  <%- include('../partials/navbar', { user }) %>
+  <main class="container">
+    <%- include('../partials/header') %>
+    <h2>Instructor: <%= user.username %></h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Course Name</th>
+          <th>Exam Period</th>
+          <th>Student</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- rows will be injected here by JS -->
+      </tbody>
+    </table>
+  </main>
+
+  <script type="module" src="/js/instructor/review-list.js"></script>
+</body>
+</html>

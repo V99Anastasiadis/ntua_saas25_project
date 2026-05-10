@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('../partials/head', { title: 'My Courses' }) %>
+</head>
+<body>
+  <%- include('../partials/navbar', { user }) %>
+  <main class="container">
+    <%- include('../partials/header') %>
+    <h2>Student: <%= user.username %></h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Course Name</th>
+          <th>Exam Period</th>
+          <th>Grading Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Populated by JS -->
+      </tbody>
+    </table>
+    <div style="font-size:0.95em;color:#888;">
+      <em>Note: You can only request a review if grading status is <b>open</b>.</em>
+    </div>
+
+    <%- include('../partials/messageBox') %>
+  </main>
+
+  <script type="module" src="/js/student/my-courses.js"></script>
+</body>
+</html>

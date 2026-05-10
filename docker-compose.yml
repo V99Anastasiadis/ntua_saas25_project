@@ -1,0 +1,407 @@
+version: "3.8"
+
+services:
+
+  # RABBIT MQ SHARED BETWEEN ALL THE SERVICES
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: always
+    container_name: clearSky-rabbitmq
+    ports:
+      - "5673:5672"    # AMQP port
+      - "15673:15672"  # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      retries: 5
+    networks:
+      - clearSky-net
+
+  orchestrator:
+    build:
+      context: ./orchestrator
+      dockerfile: Dockerfile
+    volumes:
+      - ./orchestrator/configs:/app/configs
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - rabbitmq
+    environment:
+      - AMQP_URL=amqp://guest:guest@rabbitmq:5672/
+    networks:
+      - clearSky-net
+
+  # STUDENT REQUEST DB
+  student_db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: reviewsdb
+    ports:
+      - "5440:5432"
+    volumes:
+      - student_db_data:/var/lib/postgresql/data
+      - ./student_request_review_service/db/reviewsdb.sql:/docker-entrypoint-initdb.d/reviewsdb.sql
+    networks:
+      - clearSky-net
+
+  # STUDENT REQUEST SERVICE
+  student_request_review_service:
+    build:
+      context: ./student_request_review_service
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      - rabbitmq
+      - student_db
+    environment:
+      - AMQP_URL=amqp://guest:guest@rabbitmq:5672/
+      - DATABASE_URL=postgres://postgres:root@student_db:5432/reviewsdb?sslmode=disable
+    networks:
+      - clearSky-net
+
+  # INSTRUCTOR DB
+  instructor_db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: reviewsdbinst
+    ports:
+      - "5441:5432"
+    volumes:
+      - instructor_db_data:/var/lib/postgresql/data
+      - ./instructor_review_reply_service/db/reviewsdb.sql:/docker-entrypoint-initdb.d/reviewsdb.sql
+    networks:
+      - clearSky-net
+
+  # INSTRUCTOR RESPONSE SERVICE
+  instructor_review_reply_service:
+    build:
+      context: ./instructor_review_reply_service
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      - rabbitmq
+      - instructor_db
+    environment:
+      - AMQP_URL=amqp://guest:guest@rabbitmq:5672/
+      - DATABASE_URL=postgres://postgres:root@instructor_db:5432/reviewsdbinst?sslmode=disable
+    networks:
+      - clearSky-net
+
+  # CREDITS SERVICE DB
+  credits_db:
+    image: postgres:14
+    container_name: credits_postgres1
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 2002
+      POSTGRES_DB: credits
+    volumes:
+      - ./credits_service/db-init:/docker-entrypoint-initdb.d:ro
+      - credits_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5442:5432"
+    networks:
+      - clearSky-net
+
+  # CREDITS SERVICE
+  credits_service:
+    build:
+      context: ./credits_service
+      dockerfile: Dockerfile
+    container_name: credits_service
+    restart: on-failure
+    depends_on:
+      - credits_db
+      - rabbitmq
+    env_file: ./credits_service/.env
+    ports:
+      - "8081:8080"
+    networks:
+      - clearSky-net
+
+  # GOOGLE AUTH SERVICE
+  google_auth_service:
+    build:
+      context: ./google_auth_service
+      dockerfile: Dockerfile
+    container_name: google_auth_service_app
+    restart: always
+    ports:
+      - "8086:8086"
+    depends_on:
+      - rabbitmq
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URL=http://localhost:8086/auth/google/callback
+      - JWT_SECRET=${JWT_SECRET:-default-secret-key}
+      - UMS_URL=http://user_management_service:8082
+      - FRONTEND_URL=http://localhost:3000
+    networks:
+      - clearSky-net
+
+  # FRONT END
+  frontend:
+    build: ./front-end
+    ports:
+      - "3000:3000"
+    depends_on:
+      - orchestrator
+      - google_auth_service
+    environment:
+      - GO_API_URL=http://orchestrator:8080
+      - GOOGLE_AUTH_URL=http://google_auth_service:8086
+      - GOOGLE_AUTH_EXTERNAL_URL=http://localhost:8086
+    networks:
+      - clearSky-net
+    
+
+  # USER MANAGEMENT SERVICE
+  user_management_service:
+    build:
+      context: ./user_management_service
+      dockerfile: Dockerfile
+    container_name: user_management_service
+    restart: always
+    ports:
+      - "8082:8082"
+    depends_on:
+      - rabbitmq
+    environment:
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+    networks:
+      - clearSky-net
+
+  # INITIAL GRADES SERVICE
+
+  initial_grades_db:
+    image: mongo:6.0
+    container_name: initial_grades_db
+    restart: always
+    environment:
+      - MONGO_URI=mongodb://initial_grades_db:27017/init_grades
+      - MONGO_USER=root
+      - MONGO_PASS=2002
+      - MONGO_HOST=localhost
+      - MONGO_PORT=27017
+      - MONGO_DB=init_grades
+      - MONGO_AUTH=admin
+    ports:
+      - "27017:27017"
+    volumes:
+      - initial_grades_db_data:/data/db
+      #- ./initial_grades/init.js:/docker-entrypoint-initdb.d/init.js
+    networks:
+        - clearSky-net
+  
+  initial_grades_service:
+    build:
+      context: ./initial_grades
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      - rabbitmq
+      - initial_grades_db
+    environment:
+      - AMQP_URL=amqp://guest:guest@rabbitmq:5672/
+      - DATABASE_URL=mongodb://initial_grades_db:27017/init_grades
+      - MONGO_URI=mongodb://initial_grades_db:27017/init_grades
+      - RABBITMQ_URI=amqp://rabbitmq:5672
+      - RABBITMQ_EXCHANGE=clearSky.events
+      - RABBITMQ_ROUTING_KEY=postgrades.init
+      - RABBITMQ_CREDIT_INCR_KEY=incr.credits
+      - MONGO_USER=root
+      - MONGO_PASS=2002
+      #- MONGO_HOST=localhost
+      #- MONGO_PORT=27017
+      - MONGO_DB=init_grades
+      - MONGO_AUTH=admin
+    networks:
+      - clearSky-net
+    
+  
+  # FINAL GRADES SERVICE
+  final_grades_db:
+    image: mongo:6.0
+    container_name: final_grades_db
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://final_grades_db:27017/final_grades     
+      - MONGO_USER=root
+      - MONGO_PASS=2002
+      - MONGO_HOST=localhost
+      - MONGO_PORT=27017
+      - MONGO_DB=final_grades
+      - MONGO_AUTH=admin
+    ports:
+      - "27018:27017"
+    volumes:
+      - final_grades_db_data:/data/db
+      #- ./final_grades/mongodb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - clearSky-net
+
+  final_grades_service:
+    build:
+      context: ./final_grades
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      - rabbitmq
+      - final_grades_db
+    environment:
+      - AMQP_URL=amqp://guest:guest@rabbitmq:5672/
+      - DATABASE_URL=mongodb://final_grades_db:27017/final_grades
+      - NODE_ENV=production
+      - MONGO_URI=mongodb://final_grades_db:27017/final_grades
+      - RABBITMQ_URI=amqp://rabbitmq:5672
+      - RABBITMQ_EXCHANGE=clearSky.events
+      - RABBITMQ_ROUTING_KEY=postgrades.final
+      - RABBITMQ_CREDIT_INCR_KEY=incr.credits
+    networks:
+      - clearSky-net
+
+  # STATS SERVICE
+
+  stats_db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      - MYSQL_URI=mysql://user:password@stats_db:3306/stats
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=stats
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    ports:
+      - "3306:3306"
+    volumes:
+      - stats_db_data:/var/lib/mysql
+      - ./stats_service/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - clearSky-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uuser", "-ppassword"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  stats_service:
+    build:
+      context: ./stats_service
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      - stats_db
+      - rabbitmq
+    environment:
+      - AMQP_URL=amqp://guest:guest@rabbitmq:5672/
+      - DATABASE_URL=mysql://user:password@stats_db:3306/stats
+      - MYSQL_URI=mysql://user:password@stats_db:3306/stats
+      - RABBITMQ_URI=amqp://rabbitmq:5672
+      - RABBITMQ_EXCHANGE=clearSky.events
+      - RABBITMQ_ROUTING_KEY=postgrades.statistics
+      - RABBITMQ_GET_GRADES_KEY=stats.get
+      - RABBITMQ_SEND_AVAIL_KEY=stats.avail
+    networks:
+      - clearSky-net
+    
+  # VIEW GRADES SERVICE
+
+  view_grades_db:
+    image: mysql:8.0
+    restart: always
+    environment:
+      - MYSQL_URI=mysql://user:password@view_grades_db:3306/view_grades
+      - MYSQL_ROOT_PASSWORD=password
+      - MYSQL_DATABASE=view_grades
+      - MYSQL_USER=user
+      - MYSQL_PASSWORD=password
+    ports:
+      - "3307:3306"
+    volumes:
+      - view_db_data:/var/lib/mysql
+      - ./View_personal_grades/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - clearSky-net
+
+
+  view_grades_service:
+    build:
+      context: ./View_personal_grades
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      - view_grades_db
+      - rabbitmq
+    environment:
+      - RABBITMQ_URI=amqp://rabbitmq:5672
+      - AMQP_URL=amqp://guest:guest@rabbitmq:5672/
+      - DATABASE_URL=mysql://user:password@view_grades_db:3306/view_grades
+      - MYSQL_URI=mysql://user:password@view_grades_db:3306/view_grades
+      - RABBITMQ_EXCHANGE=clearSky.events
+      - RABBITMQ_ROUTING_KEY=postgrades.view
+      - RABBITMQ_GET_GRADES_KEY=view.avail
+    networks:
+      - clearSky-net
+
+  # REGISTRATION DB
+  reg_db:
+    image: postgres:14
+    container_name: reg_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: 2002
+      POSTGRES_DB: reg_service
+    volumes:
+      - ./registration_service/db-init:/docker-entrypoint-initdb.d:ro
+      - reg_pgdata:/var/lib/postgresql/data
+    ports:
+      - "5443:5432"
+    networks:
+      - clearSky-net
+
+  # REGISTRATION SERVICE
+  registration_service:
+    build:
+      context: ./registration_service
+      dockerfile: Dockerfile
+    container_name: registration_service
+    restart: on-failure
+    depends_on:
+      - reg_db
+      - rabbitmq
+    env_file: ./registration_service/.env
+    ports:
+      - "8083:8080"
+    networks:
+      - clearSky-net
+
+networks:
+  clearSky-net:
+    driver: bridge
+
+volumes:
+  student_db_data:
+  instructor_db_data:
+  credits_pgdata:
+  initial_grades_db_data:
+  final_grades_db_data:
+  stats_db_data:
+  view_db_data:
+  reg_pgdata:
+

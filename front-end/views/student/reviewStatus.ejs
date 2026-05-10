@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('../partials/head', { title: 'Review Request Status' }) %>
+</head>
+<body>
+  <%- include('../partials/navbar', { user }) %>
+  <main class="container">
+    <%- include('../partials/header') %>
+    <h2>Student: <%= user.username %></h2>
+
+    
+    <div class="panel" id="review-status-panel">
+      <div class="panel-header">REVIEW REQUEST STATUS</div>
+      <div class="form-group">
+        <label>Course</label>
+        <input type="text" id="course_id" readonly>
+      </div>
+      <div class="form-group">
+        <label>Exam Period</label>
+        <input type="text" id="exam_period" readonly>
+      </div>
+      <div class="form-group">
+        <label>Your message</label>
+        <textarea id="student_message" readonly style="width:100%;height:60px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <input type="text" id="status" readonly>
+      </div>
+      <div class="form-group">
+        <label>Instructor's action</label>
+        <input type="text" id="instructor_action" readonly>
+      </div>
+      <div class="form-group">
+        <label>Message from instructor</label>
+        <textarea id="instructor_reply_message" readonly style="width:100%;height:100px;"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Created at</label>
+        <input type="text" id="review_created_at" readonly>
+      </div>
+      <div class="form-group">
+        <label>Reviewed at</label>
+        <input type="text" id="reviewed_at" readonly>
+      </div>
+      <button class="button">Acknowledge</button>
+    </div>
+  </main>
+
+  <script type="module" src="/js/student/review-status.js"></script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <%- include('../partials/head', { title: 'View Personal Grades' }) %>
+</head>
+<body>
+  <%- include('../partials/navbar', { user }) %>
+  <main class="container">
+    <%- include('../partials/header') %>
+    <h2>Student: <%= user.username %></h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Declaration Period</th>
+          <th>Course Name</th>
+          <th>Grading Status</th>
+          <th>Grade</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Rows will be injected by personal.js -->
+      </tbody>
+    </table>
+
+    <%- include('../partials/messageBox') %>
+  </main>
+
+  <!-- Make sure this path matches where your bundler/static server serves it -->
+  <script type="module" src="/js/student/personal.js"></script>
+</body>
+</html>

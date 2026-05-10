@@ -1,0 +1,18 @@
+<!DOCTYPE html><html lang="en"><head>
+  <%- include('../partials/head',{title}) %>
+</head><body>
+  <%- include('../partials/navbar',{user}) %>
+  <main class="container">
+    <%- include('../partials/header') %>
+    <h1>Institution Dashboard</h1>
+    <ul>
+      <div class="dashboard-grid mt-2">
+        <a href="/institution/register"       class="card button-link">1. Register institution</a>
+        <a href="/institution/purchase"       class="card button-link">2. Purchase credits</a>
+        <a href="/institution/statistics"     class="card button-link">3. View statistics</a>
+        <a href="/institution/user-management"    class="card button-link">4. User Management</a>
+
+      </div>
+
+  </main>
+</body></html>

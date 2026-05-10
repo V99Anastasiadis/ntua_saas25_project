@@ -1,0 +1,44 @@
+<!-- views/partials/navbar.ejs -->
+<nav class="navbar">
+  <div class="navbar__brand">
+    <a href="/" class="navbar__logo">clearSKY</a>
+  </div>
+
+  <% if (!user) { %>
+    <!-- Guest nav -->
+    <ul class="navbar__links">
+      <li>
+        <a href="/login"
+           class="<%= currentUrl === '/login' ? 'active' : '' %>">
+          Log in
+        </a>
+      </li>
+    </ul>
+
+  <% } else { %>
+    <!-- Authenticated nav – role-aware -->
+    <ul class="navbar__links">
+      <% if (user.role === 'student') { %>
+        <%- include('./nav-student', { currentUrl }) %>
+
+      <% } else if (user.role === 'instructor') { %>
+        <%- include('./nav-instructor', { currentUrl }) %>
+
+      <% } else if (['institution',
+                     'institution_representative',
+                     'representative'].includes(user.role)) { %>
+        <%- include('./nav-institution', { currentUrl }) %>
+
+      <% } else { %>
+        <li><a href="/">Home</a></li>
+      <% } %>
+    </ul>
+
+    <div class="navbar__auth">
+      <span class="navbar__user">Hi, <%= user.username %></span>
+      <a href="/login" id="logout-button" class="button button--secondary">
+        Log out
+      </a>
+    </div>
+  <% } %>
+</nav>
